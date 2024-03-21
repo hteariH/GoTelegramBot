@@ -72,7 +72,7 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 
 		if found {
 			date := formatDate(nextSessionDateString)
-			message := fmt.Sprintf("The next session is %s %s on time %s\n", eventName, nextSession, date)
+			message := fmt.Sprintf("The next session is %s %s at %s UA Time\n ", eventName, nextSession, date)
 			sendMessage(update, message, bot)
 		} else {
 			fmt.Println("There are no upcoming sessions.")
