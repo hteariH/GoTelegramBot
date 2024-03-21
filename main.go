@@ -54,7 +54,7 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 		url := "https://f1-live-motorsport-data.p.rapidapi.com/races/2024"
 		req, _ := http.NewRequest("GET", url, nil)
 
-		req.Header.Add("X-RapidAPI-Key", "b9bd49704bmsh18964c84a154f62p141686jsn030dde3da05c")
+		req.Header.Add("X-RapidAPI-Key", os.Getenv("rapidapi_key"))
 		req.Header.Add("X-RapidAPI-Host", "f1-live-motorsport-data.p.rapidapi.com")
 
 		res, _ := http.DefaultClient.Do(req)
