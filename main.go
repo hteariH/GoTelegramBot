@@ -33,26 +33,39 @@ func main() {
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
 		text := update.Message.Text
-		if isFixeable(text) {
-			var fixedMessage = fixmsg(text)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.From.UserName+" sent: "+fixedMessage)
-			bot.Send(msg)
-			deleteConfig := tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID)
-			_, err := bot.DeleteMessage(deleteConfig)
-			if err != nil {
-				log.Println("Unable to delete message:", err)
-			}
-		}
+
+		processAndSendMessage(text, update, bot)
 	}
 }
 
-func isFixeable(text string) bool {
+func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.BotAPI) {
+	if containsFixableEmbed(text) {
+		var fixedMessage = fixEmbedText(text)
+		sendMessage(update, fixedMessage, bot)
+		deleteMessage(update, bot)
+	}
+}
+
+func sendMessage(update tgbotapi.Update, fixedMessage string, bot *tgbotapi.BotAPI) {
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.From.UserName+" sent: "+fixedMessage)
+	bot.Send(msg)
+}
+
+func deleteMessage(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
+	deleteConfig := tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID)
+	_, err := bot.DeleteMessage(deleteConfig)
+	if err != nil {
+		log.Println("Unable to delete message:", err)
+	}
+}
+
+func containsFixableEmbed(text string) bool {
 	return strings.Contains(text, "://twitter.com/") ||
 		strings.Contains(text, "://x.com/") ||
 		strings.Contains(text, "://www.instagram.com/p/") ||
 		strings.Contains(text, "://www.instagram.com/reel")
 }
-func fixmsg(text string) string {
+func fixEmbedText(text string) string {
 
 	text = strings.ReplaceAll(text, "://twitter.com/", "://fxtwitter.com/")
 	text = strings.ReplaceAll(text, "://x.com/", "://fixupx.com/")
