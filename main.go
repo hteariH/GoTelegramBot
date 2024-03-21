@@ -13,6 +13,8 @@ import (
 )
 
 var STICKER_SREZKI = "CAACAgIAAxkBAANNZfw-z3y76LA4KRohD4x339CmeS4AAl4tAAL8dcBIPkvpr8s75to0BA"
+var STICKER_PENDOS = "CAACAgIAAxkBAANTZfxBwnzzLhYf8gXmtEgGn80uNlwAAp8sAAJCF1lLWBhOY9sCPzs0BA"
+
 var cache *Cache
 
 func main() {
@@ -95,8 +97,28 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 	} else if textIsAboutCuts(text) {
 		share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_SREZKI)
 		bot.Send(share)
+	} else if textIsAboutPendos(text) {
+		share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_PENDOS)
+		bot.Send(share)
 	}
 
+}
+
+func textIsAboutPendos(text string) bool {
+	text = strings.ToLower(text)
+	if strings.Contains(text, "пендос") {
+		return true
+	}
+	if strings.Contains(text, "пендос") {
+		return true
+	}
+	if strings.Contains(text, "піндос") {
+		return true
+	}
+	if strings.Contains(text, "пиндос") {
+		return true
+	}
+	return false
 }
 
 func textIsAboutCuts(text string) bool {
