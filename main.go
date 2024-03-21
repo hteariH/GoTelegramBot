@@ -12,7 +12,13 @@ import (
 	"time"
 )
 
+var STICKER_SREZKI = "CAACAgIAAxkBAANNZfw-z3y76LA4KRohD4x339CmeS4AAl4tAAL8dcBIPkvpr8s75to0BA"
+var cache *Cache
+
 func main() {
+
+	cache = NewCache()
+
 	botToken := os.Getenv("LinkFixer_Bot_token")
 	bot, err := tgbotapi.NewBotAPI(botToken)
 	if err != nil {
@@ -48,20 +54,26 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 		var fixedMessage = fixEmbedText(text)
 		sendMessageBy(update, fixedMessage, bot)
 		deleteMessage(update, bot)
-	}
+	} else if containsF1NextRequest(text) {
 
-	if containsF1NextRequest(text) {
 		url := "https://f1-live-motorsport-data.p.rapidapi.com/races/2024"
 		req, _ := http.NewRequest("GET", url, nil)
 
 		req.Header.Add("X-RapidAPI-Key", os.Getenv("rapidapi_key"))
 		req.Header.Add("X-RapidAPI-Host", "f1-live-motorsport-data.p.rapidapi.com")
 
-		res, _ := http.DefaultClient.Do(req)
+		var data []byte
+		f1data, cfound := cache.Get(url)
+		if cfound {
+			data = f1data
+		} else {
 
-		defer res.Body.Close()
+			res, _ := http.DefaultClient.Do(req)
 
-		data, _ := io.ReadAll(res.Body)
+			defer res.Body.Close()
+			data, _ = io.ReadAll(res.Body)
+			cache.Set(url, data)
+		}
 		var racecalendar RaceCalendar
 
 		err := json.Unmarshal(data, &racecalendar)
@@ -80,8 +92,21 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 		}
 
 		//fmt.Printf("%+v", sessions)
+	} else if textIsAboutCuts(text) {
+		share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_SREZKI)
+		bot.Send(share)
 	}
 
+}
+
+func textIsAboutCuts(text string) bool {
+	if strings.Contains(text, "срезки") {
+		return true
+	}
+	if strings.Contains(text, "зрізки") {
+		return true
+	}
+	return false
 }
 
 func formatDate(dateString string) string {
