@@ -38,6 +38,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	ticker := time.NewTicker(1 * time.Minute)
+
+	go func() {
+		for t := range ticker.C {
+			checkF1Notification(bot)
+			fmt.Println("Tick at", t)
+		}
+	}()
+
 	for update := range updates {
 		if update.Message == nil {
 			continue
@@ -49,6 +58,51 @@ func main() {
 
 		processAndSendMessage(text, update, bot)
 	}
+}
+
+func checkF1Notification(bot *tgbotapi.BotAPI) {
+	var f1chat int64 = -1001663174934
+	nextSession, nextSessionDateString, eventName, found := getNextMessageWithCache()
+	if found {
+		t, _ := time.Parse(time.RFC3339, nextSessionDateString)
+		fmt.Println(nextSessionDateString)
+		//t, _ := time.Parse(time.RFC3339, "2024-03-23T12:23:00+00:00")
+		fmt.Println(t)
+		if time.Until(t) <= 5*time.Minute && time.Until(t) >= 4*time.Minute {
+			message := tgbotapi.NewMessage(f1chat, eventName+" "+nextSession+" is about to start!")
+			bot.Send(message)
+		}
+	}
+
+}
+
+func getNextMessageWithCache() (string, string, string, bool) {
+	url := "https://f1-live-motorsport-data.p.rapidapi.com/races/2024"
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Add("X-RapidAPI-Key", os.Getenv("rapidapi_key"))
+	req.Header.Add("X-RapidAPI-Host", "f1-live-motorsport-data.p.rapidapi.com")
+
+	var data []byte
+	f1data, cfound := cache.Get(url)
+	if cfound {
+		data = f1data
+	} else {
+
+		res, _ := http.DefaultClient.Do(req)
+
+		defer res.Body.Close()
+		data, _ = io.ReadAll(res.Body)
+		cache.Set(url, data)
+	}
+	var racecalendar RaceCalendar
+
+	err := json.Unmarshal(data, &racecalendar)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	nextSession, nextSessionDateString, eventName, found := getNextSession(racecalendar)
+	return nextSession, nextSessionDateString, eventName, found
 }
 
 func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.BotAPI) {
@@ -109,7 +163,7 @@ func textIsAboutPendos(text string) bool {
 	if strings.Contains(text, "пендос") {
 		return true
 	}
-	if strings.Contains(text, "пендос") {
+	if strings.Contains(text, "пєндос") {
 		return true
 	}
 	if strings.Contains(text, "піндос") {
@@ -122,6 +176,7 @@ func textIsAboutPendos(text string) bool {
 }
 
 func textIsAboutCuts(text string) bool {
+	text = strings.ToLower(text)
 	if strings.Contains(text, "срезки") {
 		return true
 	}
