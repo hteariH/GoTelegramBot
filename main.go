@@ -71,6 +71,9 @@ func checkF1Notification(bot *tgbotapi.BotAPI) {
 		if time.Until(t) <= 5*time.Minute && time.Until(t) >= 4*time.Minute {
 			message := tgbotapi.NewMessage(f1chat, eventName+" "+nextSession+" is about to start!")
 			bot.Send(message)
+		} else if time.Until(t) <= 60*time.Minute && time.Until(t) >= 59*time.Minute {
+			message := tgbotapi.NewMessage(f1chat, eventName+" "+nextSession+" starts in about one hour!")
+			bot.Send(message)
 		}
 	}
 
