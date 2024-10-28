@@ -401,13 +401,13 @@ func containsFixableEmbed(text string) bool {
 		strings.Contains(text, "://x.com/") ||
 		strings.Contains(text, "://www.instagram.com/p/") ||
 		strings.Contains(text, "://www.instagram.com/reel") ||
-		strings.Contains(text, "://www.tiktok.com")
+		strings.Contains(text, ".tiktok.com")
 }
 func fixEmbedText(text string) string {
 
 	text = strings.ReplaceAll(text, "://twitter.com/", "://fxtwitter.com/")
 	text = strings.ReplaceAll(text, "://x.com/", "://fixupx.com/")
 	text = strings.ReplaceAll(text, "://www.instagram.com/", "://www.ddinstagram.com/")
-	text = strings.ReplaceAll(text, "://www.tiktok.com/", "://www.tiktokez.com/")
+	text = strings.ReplaceAll(text, ".tiktok.com/", ".tiktokez.com/")
 	return text
 }
