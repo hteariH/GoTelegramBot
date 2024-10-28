@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -21,7 +23,20 @@ var f1chat int64 = -1001663174934
 var cache *Cache
 
 func main() {
+	go func() {
+		fs := http.FileServer(http.Dir("./public"))
+		http.Handle("/", fs)
 
+		err := http.ListenAndServe(":8080", nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	err := os.MkdirAll("./public", os.ModePerm)
+	if err != nil {
+		log.Fatalf("failed creating directory: %s", err)
+	}
 	cache = NewCache()
 
 	botToken := os.Getenv("LinkFixer_Bot_token")
@@ -139,40 +154,134 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 }
 
 func sendNextF1Session(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
-	url := "https://f1-live-motorsport-data.p.rapidapi.com/races/2024"
-	req, _ := http.NewRequest("GET", url, nil)
+	htmlContent := `
+	<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LFM Pro Series Stats</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2em auto;
+            padding: 1em;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9em;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        table thead {
+            background-color: #009879;
+            color: #ffffff;
+            cursor: pointer;
+        }
+        table th, table td {
+            padding: 12px 15px;
+            text-align: center;
+        }
+        table th.sortable:hover {
+            background-color: #007965;
+        }
+        table tbody tr:nth-child(even) {
+            background-color: #f3f3f3;
+        }
+        table tbody tr:hover {
+            background-color: #e9f1f7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LFM Pro Series Stats</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th class="sortable" onclick="sortTable(0)">First Name</th>
+                    <th class="sortable" onclick="sortTable(1)">Last Name</th>
+                    <th class="sortable" onclick="sortTable(2)">Races</th>
+                    <th class="sortable" onclick="sortTable(3)">Wins</th>
+                    <th class="sortable" onclick="sortTable(4)">Podiums</th>
+                    <th class="sortable" onclick="sortTable(5)">Poles</th>
+                    <th class="sortable" onclick="sortTable(6)">Top 5s</th>
+                    <th class="sortable" onclick="sortTable(7)">Top 10s</th>
+                    <th class="sortable" onclick="sortTable(8)">Avg Finish</th>
+                    <th class="sortable" onclick="sortTable(9)">Avg Qualify</th>
+                    <th class="sortable" onclick="sortTable(10)">Points</th>
+                    <th class="sortable" onclick="sortTable(11)">Winrate</th>
+                    <th class="sortable" onclick="sortTable(12)">Podium Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+               <REPLACE>
+            </tbody>
+        </table>
+    </div>
+    <script>
+        function sortTable(columnIndex) {
+            var table = document.querySelector("table tbody");
+            var rows = Array.from(table.rows);
+            var ascending = table.getAttribute("data-sort-order") !== "asc";
 
-	req.Header.Add("X-RapidAPI-Key", os.Getenv("rapidapi_key"))
-	req.Header.Add("X-RapidAPI-Host", "f1-live-motorsport-data.p.rapidapi.com")
+            rows.sort(function(rowA, rowB) {
+                var cellA = rowA.cells[columnIndex].innerText;
+                var cellB = rowB.cells[columnIndex].innerText;
 
-	var data []byte
-	f1data, cfound := cache.Get(url)
-	if cfound {
-		data = f1data
-	} else {
+                var numA = parseFloat(cellA) || cellA;
+                var numB = parseFloat(cellB) || cellB;
 
-		res, _ := http.DefaultClient.Do(req)
+                return ascending ? numA > numB ? 1 : -1 : numA < numB ? 1 : -1;
+            });
 
-		defer res.Body.Close()
-		data, _ = io.ReadAll(res.Body)
-		cache.Set(url, data)
+            table.innerHTML = "";
+            rows.forEach(row => table.appendChild(row));
+            table.setAttribute("data-sort-order", ascending ? "asc" : "desc");
+        }
+    </script>
+</body>
+</html>
+
+	`
+
+	file, _ := os.Open("./public/lfm_proseries_data.csv")
+	reader := csv.NewReader(file)
+	// Create a StringBuilder to build HTML
+	var html strings.Builder
+	for {
+		record, err := reader.Read()
+
+		if err == io.EOF {
+			break
+		}
+
+		html.WriteString("\t<tr>\n")
+		for _, value := range record {
+			html.WriteString(fmt.Sprintf("\t\t<td>%s</td>\n", value))
+			log.Println("writing line: " + value)
+		}
+		html.WriteString("\t</tr>\n")
 	}
-	var racecalendar RaceCalendar
-
-	err := json.Unmarshal(data, &racecalendar)
+	htmlContent = strings.Replace(htmlContent, "<REPLACE>", html.String(), -1)
+	log.Println("writing to file")
+	err := ioutil.WriteFile("./public/output.html", []byte(htmlContent), 0644)
 	if err != nil {
-		fmt.Println("error:", err)
+		log.Fatalf("failed writing to file: %s", err)
 	}
-	nextSession, nextSessionDateString, eventName, found := getNextSession(racecalendar)
 
-	if found {
-		date := formatDate(nextSessionDateString)
-		message := fmt.Sprintf("The next session is %s %s at %s UA Time\n ", eventName, nextSession, date)
-		sendMessage(update, message, bot)
-	} else {
-		fmt.Println("There are no upcoming sessions.")
-		sendMessage(update, "There are no upcoming sessions.", bot)
-	}
 }
 
 func textIsAboutPenta(text string) bool {
@@ -291,12 +400,14 @@ func containsFixableEmbed(text string) bool {
 	return strings.Contains(text, "://twitter.com/") ||
 		strings.Contains(text, "://x.com/") ||
 		strings.Contains(text, "://www.instagram.com/p/") ||
-		strings.Contains(text, "://www.instagram.com/reel")
+		strings.Contains(text, "://www.instagram.com/reel") ||
+		strings.Contains(text, "://www.tiktok.com")
 }
 func fixEmbedText(text string) string {
 
 	text = strings.ReplaceAll(text, "://twitter.com/", "://fxtwitter.com/")
 	text = strings.ReplaceAll(text, "://x.com/", "://fixupx.com/")
 	text = strings.ReplaceAll(text, "://www.instagram.com/", "://www.ddinstagram.com/")
+	text = strings.ReplaceAll(text, "://www.tiktok.com/", "://www.tiktokez.com/")
 	return text
 }
