@@ -14,6 +14,9 @@ import (
 
 var STICKER_SREZKI = "CAACAgIAAxkBAANNZfw-z3y76LA4KRohD4x339CmeS4AAl4tAAL8dcBIPkvpr8s75to0BA"
 var STICKER_PENDOS = "CAACAgIAAxkBAANTZfxBwnzzLhYf8gXmtEgGn80uNlwAAp8sAAJCF1lLWBhOY9sCPzs0BA"
+var STICKER_PENTA = "CAACAgIAAxkBAAN6ZjfrzN_Udx8D_JGFTAWnYepe66UAAuQ6AAIzJjlKreL0DOfMhNQ1BA"
+
+var f1chat int64 = -1001663174934
 
 var cache *Cache
 
@@ -42,7 +45,7 @@ func main() {
 
 	go func() {
 		for t := range ticker.C {
-			checkF1Notification(bot)
+			//checkF1Notification(bot)
 			fmt.Println("Tick at", t)
 		}
 	}()
@@ -60,24 +63,24 @@ func main() {
 	}
 }
 
-func checkF1Notification(bot *tgbotapi.BotAPI) {
-	var f1chat int64 = -1001663174934
-	nextSession, nextSessionDateString, eventName, found := getNextMessageWithCache()
-	if found {
-		t, _ := time.Parse(time.RFC3339, nextSessionDateString)
-		fmt.Println(nextSessionDateString)
-		//t, _ := time.Parse(time.RFC3339, "2024-03-23T12:23:00+00:00")
-		fmt.Println(t)
-		if time.Until(t) <= 5*time.Minute && time.Until(t) >= 4*time.Minute {
-			message := tgbotapi.NewMessage(f1chat, eventName+" "+nextSession+" is about to start!")
-			bot.Send(message)
-		} else if time.Until(t) <= 60*time.Minute && time.Until(t) >= 59*time.Minute {
-			message := tgbotapi.NewMessage(f1chat, eventName+" "+nextSession+" starts in about one hour!")
-			bot.Send(message)
-		}
-	}
+//func checkF1Notification(bot *tgbotapi.BotAPI) {
+//	//var f1chat int64 = -1001663174934
+//	//nextSession, nextSessionDateString, eventName, found := getNextMessageWithCache()
+//	if found {
+//		t, _ := time.Parse(time.RFC3339, nextSessionDateString)
+//		fmt.Println(nextSessionDateString)
+//		//t, _ := time.Parse(time.RFC3339, "2024-03-23T12:23:00+00:00")
+//		fmt.Println(t)
+//		if time.Until(t) <= 5*time.Minute && time.Until(t) >= 4*time.Minute {
+//			//message := tgbotapi.NewMessage(f1chat, eventName+" "+nextSession+" is about to start!")
+//			//bot.Send(message)
+//		} else if time.Until(t) <= 60*time.Minute && time.Until(t) >= 59*time.Minute {
+//			//message := tgbotapi.NewMessage(f1chat, eventName+" "+nextSession+" starts in about one hour!")
+//			//bot.Send(message)
+//		}
+//	}
 
-}
+//}
 
 func getNextMessageWithCache() (string, string, string, bool) {
 	url := "https://f1-live-motorsport-data.p.rapidapi.com/races/2024"
@@ -109,56 +112,84 @@ func getNextMessageWithCache() (string, string, string, bool) {
 }
 
 func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.BotAPI) {
+	if update.Message.Chat.ID != f1chat && update.Message.Chat.Title != "holywars" {
+		sendMessageByToMe(update, text, bot)
+	}
 	if containsFixableEmbed(text) {
 		var fixedMessage = fixEmbedText(text)
 		sendMessageBy(update, fixedMessage, bot)
 		deleteMessage(update, bot)
 	} else if containsF1NextRequest(text) {
-
-		url := "https://f1-live-motorsport-data.p.rapidapi.com/races/2024"
-		req, _ := http.NewRequest("GET", url, nil)
-
-		req.Header.Add("X-RapidAPI-Key", os.Getenv("rapidapi_key"))
-		req.Header.Add("X-RapidAPI-Host", "f1-live-motorsport-data.p.rapidapi.com")
-
-		var data []byte
-		f1data, cfound := cache.Get(url)
-		if cfound {
-			data = f1data
-		} else {
-
-			res, _ := http.DefaultClient.Do(req)
-
-			defer res.Body.Close()
-			data, _ = io.ReadAll(res.Body)
-			cache.Set(url, data)
-		}
-		var racecalendar RaceCalendar
-
-		err := json.Unmarshal(data, &racecalendar)
-		if err != nil {
-			fmt.Println("error:", err)
-		}
-		nextSession, nextSessionDateString, eventName, found := getNextSession(racecalendar)
-
-		if found {
-			date := formatDate(nextSessionDateString)
-			message := fmt.Sprintf("The next session is %s %s at %s UA Time\n ", eventName, nextSession, date)
-			sendMessage(update, message, bot)
-		} else {
-			fmt.Println("There are no upcoming sessions.")
-			sendMessage(update, "There are no upcoming sessions.", bot)
-		}
-
+		sendNextF1Session(update, bot)
 		//fmt.Printf("%+v", sessions)
-	} else if textIsAboutCuts(text) {
-		share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_SREZKI)
-		bot.Send(share)
-	} else if textIsAboutPendos(text) {
-		share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_PENDOS)
-		bot.Send(share)
+	} else if update.Message.Chat.ID == f1chat {
+		if textIsAboutCuts(text) {
+			share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_SREZKI)
+			bot.Send(share)
+		} else if textIsAboutPendos(text) {
+			share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_PENDOS)
+			bot.Send(share)
+		} else if textIsAboutPenta(text) {
+			share := tgbotapi.NewStickerShare(update.Message.Chat.ID, STICKER_PENTA)
+			bot.Send(share)
+			//sendMessage(update, "ебучий дрогобыщец", bot)
+		}
 	}
 
+}
+
+func sendNextF1Session(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
+	url := "https://f1-live-motorsport-data.p.rapidapi.com/races/2024"
+	req, _ := http.NewRequest("GET", url, nil)
+
+	req.Header.Add("X-RapidAPI-Key", os.Getenv("rapidapi_key"))
+	req.Header.Add("X-RapidAPI-Host", "f1-live-motorsport-data.p.rapidapi.com")
+
+	var data []byte
+	f1data, cfound := cache.Get(url)
+	if cfound {
+		data = f1data
+	} else {
+
+		res, _ := http.DefaultClient.Do(req)
+
+		defer res.Body.Close()
+		data, _ = io.ReadAll(res.Body)
+		cache.Set(url, data)
+	}
+	var racecalendar RaceCalendar
+
+	err := json.Unmarshal(data, &racecalendar)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	nextSession, nextSessionDateString, eventName, found := getNextSession(racecalendar)
+
+	if found {
+		date := formatDate(nextSessionDateString)
+		message := fmt.Sprintf("The next session is %s %s at %s UA Time\n ", eventName, nextSession, date)
+		sendMessage(update, message, bot)
+	} else {
+		fmt.Println("There are no upcoming sessions.")
+		sendMessage(update, "There are no upcoming sessions.", bot)
+	}
+}
+
+func textIsAboutPenta(text string) bool {
+	text = strings.ToLower(text)
+	if strings.Contains(text, "пента") {
+		return true
+	}
+	if strings.Contains(text, "пєнта") {
+		return true
+	}
+	if strings.Contains(text, "пенти") {
+		return true
+	}
+	if strings.Contains(text, "пєнти") {
+		return true
+	}
+	return false
 }
 
 func textIsAboutPendos(text string) bool {
@@ -235,6 +266,11 @@ func containsF1NextRequest(text string) bool {
 
 func sendMessageBy(update tgbotapi.Update, fixedMessage string, bot *tgbotapi.BotAPI) {
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.From.UserName+" sent: "+fixedMessage)
+	bot.Send(msg)
+}
+
+func sendMessageByToMe(update tgbotapi.Update, fixedMessage string, bot *tgbotapi.BotAPI) {
+	msg := tgbotapi.NewMessage(6991628262, update.Message.From.UserName+" sent: "+fixedMessage)
 	bot.Send(msg)
 }
 
