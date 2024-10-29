@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,6 +24,7 @@ var f1chat int64 = -1001663174934
 var cache *Cache
 
 func main() {
+
 	go func() {
 		fs := http.FileServer(http.Dir("./public"))
 		http.Handle("/", fs)
@@ -62,9 +64,10 @@ func main() {
 		for t := range ticker.C {
 			//checkF1Notification(bot)
 			fmt.Println("Tick at", t)
+			//sendNextF1Session()
 		}
 	}()
-
+	sendNextF1Session()
 	for update := range updates {
 		if update.Message == nil {
 			continue
@@ -135,7 +138,7 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 		sendMessageBy(update, fixedMessage, bot)
 		deleteMessage(update, bot)
 	} else if containsF1NextRequest(text) {
-		sendNextF1Session(update, bot)
+		sendNextF1Session()
 		//fmt.Printf("%+v", sessions)
 	} else if update.Message.Chat.ID == f1chat {
 		if textIsAboutCuts(text) {
@@ -153,7 +156,7 @@ func processAndSendMessage(text string, update tgbotapi.Update, bot *tgbotapi.Bo
 
 }
 
-func sendNextF1Session(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
+func sendNextF1Session() {
 	htmlContent := `
 	<!DOCTYPE html>
 <html lang="en">
@@ -171,8 +174,7 @@ func sendNextF1Session(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
         }
         .container {
             max-width: 1200px;
-            margin: 2em auto;
-            padding: 1em;
+            padding: 50px;
         }
         h1 {
             text-align: center;
@@ -191,7 +193,7 @@ func sendNextF1Session(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
             cursor: pointer;
         }
         table th, table td {
-            padding: 12px 15px;
+            padding: 12px 10px;
             text-align: center;
         }
         table th.sortable:hover {
@@ -210,57 +212,52 @@ func sendNextF1Session(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
         <h1>LFM Pro Series Stats</h1>
         <table>
             <thead>
-                <tr>
-                    <th class="sortable" onclick="sortTable(0)">First Name</th>
-                    <th class="sortable" onclick="sortTable(1)">Last Name</th>
-                    <th class="sortable" onclick="sortTable(2)">Races</th>
-                    <th class="sortable" onclick="sortTable(3)">Wins</th>
-                    <th class="sortable" onclick="sortTable(4)">Podiums</th>
-                    <th class="sortable" onclick="sortTable(5)">Poles</th>
-                    <th class="sortable" onclick="sortTable(6)">Top 5s</th>
-                    <th class="sortable" onclick="sortTable(7)">Top 10s</th>
-                    <th class="sortable" onclick="sortTable(8)">Avg Finish</th>
-                    <th class="sortable" onclick="sortTable(9)">Avg Qualify</th>
-                    <th class="sortable" onclick="sortTable(10)">Points</th>
-                    <th class="sortable" onclick="sortTable(11)">Winrate</th>
-                    <th class="sortable" onclick="sortTable(12)">Podium Rate</th>
-                </tr>
+                
+					<REPLACE0>
+                
             </thead>
             <tbody>
-               <REPLACE>
+               <REPLACE1>
             </tbody>
         </table>
     </div>
     <script>
-        function sortTable(columnIndex) {
-            var table = document.querySelector("table tbody");
-            var rows = Array.from(table.rows);
-            var ascending = table.getAttribute("data-sort-order") !== "asc";
+       function sortTable(columnIndex) {
+    var table = document.querySelector("table tbody");
+    var rows = Array.from(table.rows);
+    var ascending = table.getAttribute("data-sort-order") !== "asc";
 
-            rows.sort(function(rowA, rowB) {
-                var cellA = rowA.cells[columnIndex].innerText;
-                var cellB = rowB.cells[columnIndex].innerText;
+    rows.sort(function (rowA, rowB) {
+        var cellA = rowA.cells.length > columnIndex? rowA.cells[columnIndex].innerText : '';
+        var cellB = rowB.cells.length > columnIndex? rowB.cells[columnIndex].innerText : '';
 
-                var numA = parseFloat(cellA) || cellA;
-                var numB = parseFloat(cellB) || cellB;
+        var numA = parseFloat(cellA) || cellA;
+        var numB = parseFloat(cellB) || cellB;
 
-                return ascending ? numA > numB ? 1 : -1 : numA < numB ? 1 : -1;
-            });
+        return ascending ? numA > numB ? 1 : -1 : numA < numB ? 1 : -1;
+    });
 
-            table.innerHTML = "";
-            rows.forEach(row => table.appendChild(row));
-            table.setAttribute("data-sort-order", ascending ? "asc" : "desc");
-        }
+    table.innerHTML = "";
+    rows.forEach(row => table.appendChild(row));
+    table.setAttribute("data-sort-order", ascending ? "asc" : "desc");
+}
     </script>
 </body>
 </html>
 
 	`
 
-	file, _ := os.Open("./public/lfm_proseries_data.csv")
-	reader := csv.NewReader(file)
-	// Create a StringBuilder to build HTML
+	resp, err := http.Get("https://gitlab.com/pst-pepega/pst-scripts/-/raw/main/LFM_Proseries_Data/lfm_proseries_data.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	reader := csv.NewReader(resp.Body)
+	reader.Comma = ','
 	var html strings.Builder
+	var headerHtml strings.Builder
+	firstLine := true
 	for {
 		record, err := reader.Read()
 
@@ -268,16 +265,46 @@ func sendNextF1Session(update tgbotapi.Update, bot *tgbotapi.BotAPI) {
 			break
 		}
 
+		headerHtml.WriteString("\t<tr>\n")
 		html.WriteString("\t<tr>\n")
+		i := 0
 		for _, value := range record {
-			html.WriteString(fmt.Sprintf("\t\t<td>%s</td>\n", value))
-			log.Println("writing line: " + value)
+
+			if firstLine {
+				headerHtml.WriteString(fmt.Sprintf("\t\t<th class=\"sortable\" onclick=\"sortTable(%d)\">%s</th>\n", i, value))
+				i++
+				log.Println("writing first line: " + value)
+			} else {
+				if i < 10 || i == 18 || i == 20 {
+					html.WriteString(fmt.Sprintf("\t\t<td>%s</td>\n", value))
+
+				} else {
+					num, err := strconv.ParseFloat(value, 64)
+					if err != nil {
+						fmt.Println(err)
+						html.WriteString(fmt.Sprintf("\t\t<td>%s</td>\n", value))
+						//return
+					} else {
+						html.WriteString(fmt.Sprintf("\t\t<td>%.2f</td>\n", num))
+					}
+
+				}
+				log.Println("writing line: " + value)
+				i++
+				//}
+			}
+
 		}
+		if firstLine {
+			firstLine = false
+		}
+		headerHtml.WriteString("\t</tr>\n")
 		html.WriteString("\t</tr>\n")
 	}
-	htmlContent = strings.Replace(htmlContent, "<REPLACE>", html.String(), -1)
+	htmlContent = strings.Replace(htmlContent, "<REPLACE0>", headerHtml.String(), -1)
+	htmlContent = strings.Replace(htmlContent, "<REPLACE1>", html.String(), -1)
 	log.Println("writing to file")
-	err := ioutil.WriteFile("./public/output.html", []byte(htmlContent), 0644)
+	err = ioutil.WriteFile("./public/lfm_proseries_data.html", []byte(htmlContent), 0644)
 	if err != nil {
 		log.Fatalf("failed writing to file: %s", err)
 	}
