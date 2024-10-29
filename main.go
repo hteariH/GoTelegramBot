@@ -167,10 +167,10 @@ func sendNextF1Session() {
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
+            background-color: #282b30;
             margin: 0;
             padding: 0;
-            color: #333;
+            color: white;
         }
         .container {
             max-width: 1200px;
@@ -178,7 +178,7 @@ func sendNextF1Session() {
         }
         h1 {
             text-align: center;
-            color: #333;
+            color: #white;
         }
         table {
             width: 100%;
@@ -188,8 +188,8 @@ func sendNextF1Session() {
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         table thead {
-            background-color: #009879;
-            color: #ffffff;
+            background-color: #424549;
+			color: #ffffff;
             cursor: pointer;
         }
         table th, table td {
@@ -200,10 +200,10 @@ func sendNextF1Session() {
             background-color: #007965;
         }
         table tbody tr:nth-child(even) {
-            background-color: #f3f3f3;
+            background-color: #424549;
         }
         table tbody tr:hover {
-            background-color: #e9f1f7;
+            background-color: #4a4c51;
         }
     </style>
 </head>
@@ -211,13 +211,11 @@ func sendNextF1Session() {
     <div class="container">
         <h1>LFM Pro Series Stats</h1>
         <table>
-            <thead>
-                
-					<REPLACE0>
-                
+            <thead> 
+				<REPLACE0>
             </thead>
             <tbody>
-               <REPLACE1>
+				<REPLACE1>
             </tbody>
         </table>
     </div>
