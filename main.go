@@ -130,23 +130,22 @@ func main() {
 		for {
 			select {
 			case <-ticker2.C:
-				futureDate := time.Date(2025, time.May, 15, 0, 0, 0, 0, time.UTC)
-				daysLeft := futureDate.Sub(now).Hours() / 24
-				message := tgbotapi.NewMessage(6991628262, "tick")
-				bot.Send(message)
+				futureDate := time.Date(2025, time.May, 2, 0, 0, 0, 0, time.UTC)
+				daysLeft := futureDate.Sub(time.Now()).Hours() / 24
 				if daysLeft > 0 {
 					msg := messages[rand.Intn(len(messages))]
 					msg = strings.Replace(msg, "%s", fmt.Sprintf("%.0f", daysLeft), -1)
 					fmt.Println(msg)
 					message := tgbotapi.NewMessage(freedom, msg)
 					bot.Send(message)
-
-					message = tgbotapi.NewMessage(6991628262, msg)
+					message = tgbotapi.NewMessage(-1001320639369, msg)
 					bot.Send(message)
 
 					ticker2.Reset(24 * time.Hour)
 				} else if daysLeft == 0 {
 					message := tgbotapi.NewMessage(freedom, "Вітаю, Україна Перемогла!!!")
+					bot.Send(message)
+					message = tgbotapi.NewMessage(-1001320639369, "Вітаю, Україна Перемогла!!!")
 					bot.Send(message)
 					ticker2.Stop() // Stops the ticker when the future date has reached.
 				} else {
