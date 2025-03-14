@@ -97,6 +97,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	chats := make(map[int64]bool)
+
 	bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 
@@ -108,15 +110,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//ticker := time.NewTicker(1 * time.Minute)
-	//
-	//go func() {
-	//	for t := range ticker.C {
-	//		//checkF1Notification(bot)
-	//		fmt.Println("Tick at", t)
-	//		//sendNextF1Session()
-	//	}
-	//}()
 	location, _ := time.LoadLocation("Europe/Kiev")
 	now := time.Now()
 	nextRunTime := time.Date(now.Year(), now.Month(), now.Day(), 13, 10, 0, 0, location)
@@ -136,17 +129,24 @@ func main() {
 					msg := messages[rand.Intn(len(messages))]
 					msg = strings.Replace(msg, "%s", fmt.Sprintf("%.0f", daysLeft), -1)
 					fmt.Println(msg)
-					message := tgbotapi.NewMessage(freedom, msg)
-					bot.Send(message)
-					message = tgbotapi.NewMessage(-1001320639369, msg)
-					bot.Send(message)
+					for chatID := range chats {
+						message := tgbotapi.NewMessage(chatID, msg)
+						_, err := bot.Send(message)
+						if err != nil {
+							log.Printf("Failed to send message to chat ID %d: %v", chatID, err)
+						}
+					}
 
 					ticker2.Reset(24 * time.Hour)
 				} else if daysLeft == 0 {
-					message := tgbotapi.NewMessage(freedom, "Вітаю, Україна Перемогла!!!")
-					bot.Send(message)
-					message = tgbotapi.NewMessage(-1001320639369, "Вітаю, Україна Перемогла!!!")
-					bot.Send(message)
+					for chatID := range chats {
+						message := tgbotapi.NewMessage(chatID, "Вітаю, Україна Перемогла!!!")
+						_, err := bot.Send(message)
+						if err != nil {
+							log.Printf("Failed to send message to chat ID %d: %v", chatID, err)
+						}
+					}
+
 					ticker2.Stop() // Stops the ticker when the future date has reached.
 				} else {
 					ticker2.Stop()
@@ -159,6 +159,9 @@ func main() {
 		if update.Message == nil {
 			continue
 		}
+		chatID := update.Message.Chat.ID
+		chats[chatID] = true
+		log.Printf("Current unique chats: %v", chats)
 
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
